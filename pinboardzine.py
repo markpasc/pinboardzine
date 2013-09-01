@@ -10,7 +10,9 @@ import uuid
 from xml.etree import ElementTree
 
 import argh
+from lxml.html.clean import Cleaner
 import readability
+import readability.cleaners
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -57,6 +59,15 @@ CONTENT_OPF_XML = """
         </guide>
     </package>
     """
+
+
+readability.cleaners.html_cleaner = Cleaner(
+    scripts=True, javascript=True, comments=True,
+    style=True, links=True, meta=False, add_nofollow=False,
+    processing_instructions=True, annoying_tags=False, remove_tags=None,
+    # these options differ:
+    page_structure=True, embedded=True, frames=True, forms=True,
+    remove_unknown_tags=True, safe_attrs_only=True)
 
 
 def contents_ncx_for_articles(articles, uid, title):
@@ -204,8 +215,15 @@ def zine(username: 'Pinboard username to find articles for',
 
         # Readabilitize it.
         readable = readability.Document(res.content.decode('utf-8'), url=url)
-        read_html = readable.summary()
+        # Summarize, then *further* remove some tags kindlegen will just remove anyway.
+        readable.summary(html_partial=True)
+        for badnode in readable.tags(readable.html, 'embed', 'frameset', 'frame'):
+            badnode.drop_tree()
+        for badnode in readable.tags(readable.html, 'acronym'):
+            badnode.drop_tag()
+        read_html = readable.get_clean_html()
         read_title = article['short_title'] = readable.short_title()
+        logging.debug("HTML for article %s begins: %r", url, read_html[:50])
 
         # Write it to the zine directory.
         filename = article['filename'] = re.sub(r'\W+', '-', url) + '.html'
