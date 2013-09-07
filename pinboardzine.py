@@ -38,14 +38,18 @@ CONTENTS_NCX_XML = """
 CONTENT_OPF_XML = """
     <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="uid">
         <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
-            <dc:title></dc:title>
-            <dc:language>en</dc:language>
-            <dc:identifier id="uid"></dc:identifier>
-            <dc:creator>pinboard-zine</dc:creator>
-            <dc:source>pinboard-zine</dc:source>
-            <dc:date opf:event="publication"></dc:date>
-            <!-- meta name="EmbeddedCover" content="images/image00002.jpeg"/ -->
-            <meta name="output encoding" content="utf-8"/>
+            <dc-metadata>
+                <dc:title></dc:title>
+                <dc:language>en</dc:language>
+                <dc:identifier id="uid"></dc:identifier>
+                <dc:creator>pinboard-zine</dc:creator>
+                <dc:source>pinboard-zine</dc:source>
+                <dc:date opf:event="publication"></dc:date>
+                <!-- meta name="EmbeddedCover" content="images/image00002.jpeg"/ -->
+            </dc-metadata>
+            <x-metadata>
+                <output content-type="application/x-mobipocket-subscription-magazine" encoding="utf-8"/>
+            </x-metadata>
         </metadata>
         <manifest>
             <item href="contents.ncx" id="ncx" media-type="application/x-dtbncx+xml"/>
@@ -73,39 +77,54 @@ def contents_ncx_for_articles(articles, uid, title):
     # Add navMap/navPointz.
     navmap_node = root.find("./{http://www.daisy.org/z3986/2005/ncx/}navMap")
 
-    def nav_point(parent, order, title, src):
+    def nav_point(parent, order, title, src, kind):
         point = ElementTree.SubElement(parent, '{http://www.daisy.org/z3986/2005/ncx/}navPoint', {
             'id': 'nav-{}'.format(order),
             'playOrder': str(order),
+            'class': kind,
         })
         label = ElementTree.SubElement(point, '{http://www.daisy.org/z3986/2005/ncx/}navLabel')
-        label_text = ElementTree.SubElement(label, '{http://www.daisy.org/z3986/2005/ncx/}text',
-            text=title)
+        label_text = ElementTree.SubElement(label, '{http://www.daisy.org/z3986/2005/ncx/}text')
+        label_text.text = title
         content = ElementTree.SubElement(point, '{http://www.daisy.org/z3986/2005/ncx/}content', {
             'src': src
         })
         return point
 
-    toc_point = nav_point(navmap_node, 1, 'Table of Contents', 'contents.html')
     first_article = articles[0]
-    section_point = nav_point(toc_point, 2, 'Unread', first_article['filename'])
+    toc_point = nav_point(navmap_node, 1, 'Table of Contents', first_article['filename'], 'periodical')
+    section_point = nav_point(toc_point, 2, 'Unread', first_article['filename'] + '#top', 'section')
     for order, article in enumerate(articles, 3):
-        nav_point(section_point, order, article['d'], article['filename'])
+        filename = article['filename']
+        if order == 3:  # first article
+            filename += '#top'
+
+        article_point = nav_point(section_point, order, article['title'], filename, 'article')
+
+        if article['description']:
+            ElementTree.SubElement(article_point, '{http://mobipocket.com/ns/mbp}meta', {
+                'name': 'description',
+            }).text = article['description']
+        if article['author']:
+            ElementTree.SubElement(article_point, '{http://mobipocket.com/ns/mbp}meta', {
+                'name': 'author',
+            }).text = article['author']
 
     ElementTree.register_namespace('', 'http://www.daisy.org/z3986/2005/ncx/')
+    ElementTree.register_namespace('mbp', 'http://mobipocket.com/ns/mbp')
     return ElementTree.tostring(root, encoding='unicode')
 
 
 def content_opf_for_articles(articles, uid, title):
     root = ElementTree.fromstring(CONTENT_OPF_XML)
 
-    title_node = root.find("./{http://www.idpf.org/2007/opf}metadata/{http://purl.org/dc/elements/1.1/}title")
+    title_node = root.find("./{http://www.idpf.org/2007/opf}metadata//{http://purl.org/dc/elements/1.1/}title")
     title_node.text = title
 
-    uid_node = root.find("./{http://www.idpf.org/2007/opf}metadata/{http://purl.org/dc/elements/1.1/}identifier[@id='uid']")
+    uid_node = root.find("./{http://www.idpf.org/2007/opf}metadata//{http://purl.org/dc/elements/1.1/}identifier[@id='uid']")
     uid_node.text = uid
 
-    date_node = root.find("./{http://www.idpf.org/2007/opf}metadata/{http://purl.org/dc/elements/1.1/}date")
+    date_node = root.find("./{http://www.idpf.org/2007/opf}metadata//{http://purl.org/dc/elements/1.1/}date")
     date_node.text = datetime.utcnow().isoformat()
 
     manifest_node = root.find("./{http://www.idpf.org/2007/opf}manifest")
