@@ -263,7 +263,8 @@ def zine(username: 'Pinboard username to find articles for',
     logging.debug("Wrote all the files to %s, running kindlegen", zinedir)
 
     # TODO: Run kindlegen to mobify the zine.
-    #subprocess.check_output(['kindlegen', content_opf_filename, '-o', outputfile], stderr=subprocess.STDOUT)
+    #subprocess.check_output(['kindlegen', content_opf_filename, '-o', 'pinboardzine.mobi'], stderr=subprocess.STDOUT)
+    #shutil.copyfile(join(zinedir, 'pinboardzine.mobi'), outputfile)
 
     # Everything went smoothly! Remove the zine dir.
     #shutil.rmtree(zinedir)
