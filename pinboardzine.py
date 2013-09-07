@@ -239,7 +239,7 @@ def zine(username: 'Pinboard username to find articles for',
         """.format(**article)
 
         # Write it to the zine directory.
-        filename = article['filename'] = re.sub(r'\W+', '-', url) + '.html'
+        filename = article['filename'] = re.sub(r'[\W_]+', '-', url) + '.html'
         with open(join(zinedir, filename), 'w') as f:
             f.write(read_html)
         # TODO: Are there images in the summarized HTML? Get those too.
