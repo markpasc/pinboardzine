@@ -7,6 +7,7 @@ import re
 import subprocess
 import tempfile
 import uuid
+from urllib.parse import urljoin
 from xml.etree import ElementTree
 
 import argh
@@ -17,6 +18,14 @@ from requests.auth import HTTPBasicAuth
 
 
 __version__ = '0.1'
+
+
+SRC_ATTR_RE = re.compile(r"""
+    (?P<src> src \s*=\s* )
+    (?P<quote> ["'] )
+    (?P<url>.*?)
+    (?=(?P=quote))
+    """, re.IGNORECASE | re.VERBOSE | re.MULTILINE | re.DOTALL)
 
 
 CONTENTS_NCX_XML = """
@@ -158,6 +167,13 @@ def content_opf_for_articles(articles, uid, title):
             'idref': article['filename'],
         })
 
+        for image in article.get('images', ()):
+            ElementTree.SubElement(manifest_node, '{http://www.idpf.org/2007/opf}item', {
+                'href': image['filename'],
+                'id': image['filename'],
+                'media-type': image['type'],
+            })
+
     ElementTree.register_namespace('', 'http://www.idpf.org/2007/opf')
     ElementTree.register_namespace('dc', 'http://purl.org/dc/elements/1.1/')
     return ElementTree.tostring(root, encoding='unicode')
@@ -185,7 +201,7 @@ def contents_html_for_articles(articles, uid, title):
     return html
 
 
-def html_for_readable_article(article, readable):
+def html_for_readable_article(article, readable, content):
     root = ElementTree.fromstring(ARTICLE_HTML.strip())
 
     title_node = root.find('./head/title')
@@ -214,7 +230,7 @@ def html_for_readable_article(article, readable):
 
     html = ElementTree.tostring(root, encoding='unicode')
     html = html[:-len('</body></html>')]
-    html = ''.join((html, readable['content'], '</body></html>'))
+    html = ''.join((html, content, '</body></html>'))
     return html
 
 
@@ -283,13 +299,47 @@ def zine(username: 'Pinboard username to find articles for',
         article['description'] = article['n'] or readable['dek'] or readable['excerpt']
         article['author'] = readable['author']
 
-        read_html = html_for_readable_article(article, readable)
+        content = readable['content']
+        def download_image(match):
+            img_url = urljoin(url, match.group('url'))
+            img_filename = re.sub(r'[\W_]+', '-', img_url)
+
+            res = req.get(img_url)
+            try:
+                res.raise_for_status()
+            except Exception as exc:
+                logging.debug("Got error downloading referenced image %s, not changing img: %s", img_url, str(exc))
+                return match.group(0)
+
+            content_type = res.headers['content-type']
+            if content_type in ('image/jpg', 'image/jpeg'):
+                img_filename += '.jpeg'
+            elif content_type == 'image/gif':
+                img_filename += '.gif'
+            elif content_type == 'image/png':
+                img_filename += '.png'
+            else:
+                logging.warning("Saved image %s with unknown content type %s", img_url, content_type)
+
+            with open(join(zinedir, img_filename), 'wb') as f:
+                f.write(res.content)
+
+            images = article.setdefault('images', list())
+            images.append({
+                'filename': img_filename,
+                'type': content_type,
+            })
+
+            return ''.join((match.group('src'), match.group('quote'), img_filename))
+
+        content = SRC_ATTR_RE.sub(download_image, readable['content'])
+        read_html = html_for_readable_article(article, readable, content)
 
         # Write it to the zine directory.
         filename = article['filename'] = re.sub(r'[\W_]+', '-', url) + '.html'
         with open(join(zinedir, filename), 'w') as f:
             f.write(read_html)
-        # TODO: Are there images in the summarized HTML? Get those too.
+        logging.debug("Saved article '%s'", article['title'])
 
         saved.append(article)
 
