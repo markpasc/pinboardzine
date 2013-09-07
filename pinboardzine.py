@@ -4,6 +4,7 @@ import json
 import logging
 from os.path import join
 import re
+import shutil
 import subprocess
 import tempfile
 import uuid
@@ -359,12 +360,24 @@ def zine(username: 'Pinboard username to find articles for',
 
     logging.debug("Wrote all the files to %s, running kindlegen", zinedir)
 
-    # TODO: Run kindlegen to mobify the zine.
-    #subprocess.check_output(['kindlegen', content_opf_filename, '-o', 'pinboardzine.mobi'], stderr=subprocess.STDOUT)
-    #shutil.copyfile(join(zinedir, 'pinboardzine.mobi'), outputfile)
+    # Run kindlegen to mobify the zine.
+    try:
+        output = subprocess.check_output(['kindlegen', content_opf_filename, '-o', 'pinboardzine.mobi'], stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as exc:
+        output = exc.output
+        # Sadly warnings are expected.
+        if b'Mobi file built with WARNINGS' not in output:
+            log_filename = outputfile + '.log'
+            with open(log_filename, 'w') as f:
+                f.write(output)
+            raise argh.CommandError("The zine file could not be built correctly. See kindlegen output at {} for errors.".format(log_filename))
+
+    shutil.copyfile(join(zinedir, 'pinboardzine.mobi'), outputfile)
+    logging.debug("Wrote Kindle mobi to %s", outputfile)
 
     # Everything went smoothly! Remove the zine dir.
-    #shutil.rmtree(zinedir)
+    shutil.rmtree(zinedir)
+    logging.debug("Cleaned up source directory")
 
 
 def main():
