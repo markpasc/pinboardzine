@@ -267,7 +267,7 @@ def zine(username: 'Pinboard username to find articles for',
 
     # Write the metadata files to the zine directory.
     uid = uuid.uuid4().hex
-    title = date.today().strftime("Pinboard Unread for %a %d %b %Y")
+    title = "Pinboard Unread"
     ncx_xml = contents_ncx_for_articles(saved, uid, title)
     opf_xml = content_opf_for_articles(saved, uid, title)
     toc_html = contents_html_for_articles(saved, uid, title)
