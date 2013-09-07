@@ -162,7 +162,10 @@ def zine(username: 'Pinboard username to find articles for',
     req.headers.update({'user-agent': 'pinboard-zine/{}'.format(__version__)})
 
     # What pinboard account do I use?
-    password = getpass.getpass('Password for {}: '.format(username))
+    try:
+        password = getpass.getpass('Password for {}: '.format(username))
+    except KeyboardInterrupt:
+        return
     pinboard_auth = HTTPBasicAuth(username, password)
     res = requests.get('https://api.pinboard.in/v1/user/secret?format=json', auth=pinboard_auth, verify=True)
     if res.status_code == 401:
