@@ -11,6 +11,7 @@ from xml.etree import ElementTree
 
 import argh
 from argh.interaction import safe_input
+import arghlog
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -266,10 +267,14 @@ def zine(username: 'Pinboard username to find articles for',
 
 
 def main():
-    argh.dispatch_command(zine)
+    parser = argh.ArghParser()
+    arghlog.add_logging(parser)
+    parser.set_default_command(zine)
+
+    logging.getLogger('requests').propagate = False
+
+    parser.dispatch()
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
-    logging.getLogger().setLevel(logging.DEBUG)
     main()
