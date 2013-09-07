@@ -10,9 +10,7 @@ import uuid
 from xml.etree import ElementTree
 
 import argh
-from lxml.html.clean import Cleaner
-import readability
-import readability.cleaners
+from argh.interaction import safe_input
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -59,15 +57,6 @@ CONTENT_OPF_XML = """
         </guide>
     </package>
     """
-
-
-readability.cleaners.html_cleaner = Cleaner(
-    scripts=True, javascript=True, comments=True,
-    style=True, links=True, meta=False, add_nofollow=False,
-    processing_instructions=True, annoying_tags=False, remove_tags=None,
-    # these options differ:
-    page_structure=True, embedded=True, frames=True, forms=True,
-    remove_unknown_tags=True, safe_attrs_only=True)
 
 
 def contents_ncx_for_articles(articles, uid, title):
@@ -123,7 +112,7 @@ def content_opf_for_articles(articles, uid, title):
     guide_node = root.find("./{http://www.idpf.org/2007/opf}guide")
     for article in articles:
         ElementTree.SubElement(guide_node, '{http://www.idpf.org/2007/opf}reference', {
-            'title': article['d'],
+            'title': article['title'],
             'href': article['filename'],
             'type': 'text',
         })
@@ -155,7 +144,7 @@ def contents_html_for_articles(articles, uid, title):
         </body></html>
     """
     ITEM = """
-        <li><a href="{filename}">{d}</a></li>
+        <li><a href="{filename}">{title}</a> {description}</li>
     """
 
     items = ''.join(ITEM.format(**article) for article in articles)
@@ -166,7 +155,8 @@ def contents_html_for_articles(articles, uid, title):
 
 def zine(username: 'Pinboard username to find articles for',
          outputfile: 'filename for the output mobi file',
-         items: 'number of items to put in the zine' =20):
+         items: 'number of items to put in the zine' =20,
+         readability_token: 'Readability Parser API token to use to parse articles' =None):
     req = requests.Session()
     req.headers.update({'user-agent': 'pinboard-zine/{}'.format(__version__)})
 
@@ -188,42 +178,61 @@ def zine(username: 'Pinboard username to find articles for',
     data = res.json()
 
     # Get the oldest `items` items, oldest first.
+    logging.debug("Using oldest %d articles of %d from Pinboard", items, len(data))
     articles = data[-items:]
     articles.reverse()
-    if logging.getLogger().isEnabledFor(logging.DEBUG):
-        logging.debug("Got articles: %s", json.dumps(articles, sort_keys=True, indent=4))
 
     # Start making a new zine (tmpdir).
     zinedir = tempfile.mkdtemp()
     logging.debug("Writing mobi files to %s", zinedir)
 
+    if readability_token is None:
+        try:
+            readability_token = safe_input('Readability Parser API token: ')
+        except KeyboardInterrupt:
+            return
+
     # For each of however many unread items:
     saved = list()
     for article in articles:
         # Fetch the resource.
-        # TODO: we're asking for random internet junk so we should be more defensive probably
         url = article['u']
+        params = {
+            'url': url,
+            'token': readability_token,
+        }
         try:
-            res = req.get(url, timeout=10)
+            res = req.get('https://readability.com/api/content/v1/parser', params=params, timeout=10)
+            res.raise_for_status()
         except Exception as exc:
             logging.exception("Couldn't request article '%s', skipping", article['d'], exc_info=exc)
             continue
-        # Is it HTML? We don't even really care if it was an error.
-        if not res.headers['Content-Type'].startswith('text/html'):
-            # Not for zining. (This `article` doesn't go in `saved`.)
-            continue
 
-        # Readabilitize it.
-        readable = readability.Document(res.content.decode('utf-8'), url=url)
-        # Summarize, then *further* remove some tags kindlegen will just remove anyway.
-        readable.summary(html_partial=True)
-        for badnode in readable.tags(readable.html, 'embed', 'frameset', 'frame'):
-            badnode.drop_tree()
-        for badnode in readable.tags(readable.html, 'acronym'):
-            badnode.drop_tag()
-        read_html = readable.get_clean_html()
-        read_title = article['short_title'] = readable.short_title()
-        logging.debug("HTML for article %s begins: %r", url, read_html[:50])
+        readable = res.json()
+        article['title'] = readable['title'] or article['d']
+        if not article['title']:
+            article['title'] = '{} article'.format(readable['domain'])
+        article['description'] = article['n'] or readable['dek'] or readable['excerpt']
+        article['author'] = readable['author']
+        article['content'] = readable['content']
+        article['domain'] = readable['domain']
+        article['url'] = url
+
+        read_html = """<!DOCTYPE html>
+        <html><head>
+            <meta charset="utf-8">
+            <title>{title}</title>
+            <meta name="author" content="{author}">
+            <meta name="description" content="{description}"
+        </head><body>
+            <div id="top">
+                <h2>{title}</h2>
+                <h3><a href="{url}">{domain}</a> &bull; by {author}</h3>
+                <hr>
+                {content}
+            </div>
+        </body></html>
+        """.format(**article)
 
         # Write it to the zine directory.
         filename = article['filename'] = re.sub(r'\W+', '-', url) + '.html'
