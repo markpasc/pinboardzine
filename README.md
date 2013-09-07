@@ -18,6 +18,8 @@ If you don't want to install its dependencies system-wide, try installing it in 
 
 `pinboardzine` uses the Readability Parser API to simplify HTML pages for Kindle viewing. Before you begin, [register a Readability API app](https://www.readability.com/developers/api) to get a Parser API token.
 
+`pinboardzine` also uses Amazon's KindleGen tool to create the Kindle files. [Download it from Amazon](http://www.amazon.com/gp/feature.html?ie=UTF8&docId=1000765211) and install it so that `kindlegen` can be run from the command line. (This tool was developed with KindleGen v2.9.)
+
 
 ## Usage ##
 
