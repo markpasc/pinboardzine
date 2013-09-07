@@ -18,7 +18,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 
-__version__ = '0.1'
+__version__ = '1.0'
 
 
 SRC_ATTR_RE = re.compile(r"""
