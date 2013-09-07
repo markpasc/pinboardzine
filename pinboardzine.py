@@ -64,6 +64,18 @@ CONTENT_OPF_XML = """
     """
 
 
+ARTICLE_HTML = """
+    <html><head>
+        <meta charset="utf-8"/>
+        <title></title>
+    </head><body>
+        <h3 id="top"></h3>
+        <h4><a href=""></a></h4>
+        <hr/>
+    </body></html>
+    """
+
+
 def contents_ncx_for_articles(articles, uid, title):
     root = ElementTree.fromstring(CONTENTS_NCX_XML)
     # Add head/meta name=dtb:uid
@@ -173,6 +185,39 @@ def contents_html_for_articles(articles, uid, title):
     return html
 
 
+def html_for_readable_article(article, readable):
+    root = ElementTree.fromstring(ARTICLE_HTML.strip())
+
+    title_node = root.find('./head/title')
+    title_node.text = article['title']
+
+    head_node = root.find('./head')
+    if article['author']:
+        ElementTree.SubElement(head_node, 'meta', {
+            'name': 'author',
+            'content': article['author'],
+        })
+    if article['description']:
+        ElementTree.SubElement(head_node, 'meta', {
+            'name': 'description',
+            'content': article['description'],
+        })
+
+    title_node = root.find('./body/h3')
+    title_node.text = article['title']
+
+    link_node = root.find('./body/h4/a')
+    link_node.attrib['href'] = article['u']
+    link_node.text = readable['domain']
+    if article['author']:
+        link_node.tail = ' by ' + article['author']
+
+    html = ElementTree.tostring(root, encoding='unicode')
+    html = html[:-len('</body></html>')]
+    html = ''.join((html, readable['content'], '</body></html>'))
+    return html
+
+
 def zine(username: 'Pinboard username to find articles for',
          outputfile: 'filename for the output mobi file',
          items: 'number of items to put in the zine' =20,
@@ -237,25 +282,8 @@ def zine(username: 'Pinboard username to find articles for',
             article['title'] = '{} article'.format(readable['domain'])
         article['description'] = article['n'] or readable['dek'] or readable['excerpt']
         article['author'] = readable['author']
-        article['content'] = readable['content']
-        article['domain'] = readable['domain']
-        article['url'] = url
 
-        read_html = """<!DOCTYPE html>
-        <html><head>
-            <meta charset="utf-8">
-            <title>{title}</title>
-            <meta name="author" content="{author}">
-            <meta name="description" content="{description}"
-        </head><body>
-            <div id="top">
-                <h2>{title}</h2>
-                <h3><a href="{url}">{domain}</a> &bull; by {author}</h3>
-                <hr>
-                {content}
-            </div>
-        </body></html>
-        """.format(**article)
+        read_html = html_for_readable_article(article, readable)
 
         # Write it to the zine directory.
         filename = article['filename'] = re.sub(r'[\W_]+', '-', url) + '.html'
