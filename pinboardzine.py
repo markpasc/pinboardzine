@@ -231,7 +231,7 @@ def html_for_readable_article(article, readable, content):
 
     html = ElementTree.tostring(root, encoding='unicode')
     html = html[:-len('</body></html>')]
-    html = ''.join((html, content, '</body></html>'))
+    html = ''.join(('<?xml version="1.0" encoding="utf-8"?>\n', html, content, '</body></html>'))
     return html
 
 
