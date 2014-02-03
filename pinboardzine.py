@@ -235,10 +235,12 @@ def html_for_readable_article(article, readable, content):
     return html
 
 
+@argh.arg('--skip', default=None, action='append')
 def zine(username: 'Pinboard username to find articles for',
          outputfile: 'filename for the output mobi file',
          items: 'number of items to put in the zine' =20,
-         readability_token: 'Readability Parser API token to use to parse articles' =None):
+         readability_token: 'Readability Parser API token to use to parse articles' =None,
+         skip: 'URLs of articles not to include' =None):
     req = requests.Session()
     req.headers.update({'user-agent': 'pinboard-zine/{}'.format(__version__)})
 
@@ -279,9 +281,13 @@ def zine(username: 'Pinboard username to find articles for',
 
     # For each of however many unread items:
     saved = list()
+    skip = set(skip) if skip is not None else set()
     for article in articles:
         # Fetch the resource.
         url = article['u']
+        if url in skip:
+            logging.info("Skipping article '%s' as requested", article['u'])
+            continue
         params = {
             'url': url,
             'token': readability_token,
