@@ -301,38 +301,42 @@ def zine(username: 'Pinboard username to find articles for',
         article['author'] = readable['author']
 
         content = readable['content']
+        downloaded_images = set()
         def download_image(match):
             img_url = urljoin(url, match.group('url'))
             img_filename = re.sub(r'[\W_]+', '-', img_url)
 
-            res = req.get(img_url)
-            try:
-                res.raise_for_status()
-            except Exception as exc:
-                logging.debug("Got error downloading referenced image %s, not changing img: %s", img_url, str(exc))
-                return match.group(0)
+            if img_url not in downloaded_images:
+                downloaded_images.add(img_url)
 
-            content_type = res.headers['content-type']
-            if content_type in ('image/jpg', 'image/jpeg'):
-                img_filename += '.jpeg'
-            elif content_type == 'image/gif':
-                img_filename += '.gif'
-            elif content_type == 'image/png':
-                img_filename += '.png'
-            elif content_type.startswith('image/'):
-                # Some unknown image type. Try the unextensionized filename.
-                pass
-            else:
-                logging.warning("Saved image %s with unknown content type %s", img_url, content_type)
+                res = req.get(img_url)
+                try:
+                    res.raise_for_status()
+                except Exception as exc:
+                    logging.debug("Got error downloading referenced image %s, not changing img: %s", img_url, str(exc))
+                    return match.group(0)
 
-            with open(join(zinedir, img_filename), 'wb') as f:
-                f.write(res.content)
+                content_type = res.headers['content-type']
+                if content_type in ('image/jpg', 'image/jpeg'):
+                    img_filename += '.jpeg'
+                elif content_type == 'image/gif':
+                    img_filename += '.gif'
+                elif content_type == 'image/png':
+                    img_filename += '.png'
+                elif content_type.startswith('image/'):
+                    # Some unknown image type. Try the unextensionized filename.
+                    pass
+                else:
+                    logging.warning("Saved image %s with unknown content type %s", img_url, content_type)
 
-            images = article.setdefault('images', list())
-            images.append({
-                'filename': img_filename,
-                'type': content_type,
-            })
+                with open(join(zinedir, img_filename), 'wb') as f:
+                    f.write(res.content)
+
+                images = article.setdefault('images', list())
+                images.append({
+                    'filename': img_filename,
+                    'type': content_type,
+                })
 
             return ''.join((match.group('src'), match.group('quote'), img_filename))
 
