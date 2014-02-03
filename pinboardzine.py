@@ -368,7 +368,8 @@ def zine(username: 'Pinboard username to find articles for',
         # Sadly warnings are expected.
         if b'Mobi file built with WARNINGS' not in output:
             log_filename = outputfile + '.log'
-            with open(log_filename, 'w') as f:
+            # CalledProcessError output is a bytes, so write out bytes.
+            with open(log_filename, 'wb') as f:
                 f.write(output)
             raise argh.CommandError("The zine file could not be built correctly. See kindlegen output at {} for errors.".format(log_filename))
 
