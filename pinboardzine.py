@@ -319,6 +319,9 @@ def zine(username: 'Pinboard username to find articles for',
                 img_filename += '.gif'
             elif content_type == 'image/png':
                 img_filename += '.png'
+            elif content_type.startswith('image/'):
+                # Some unknown image type. Try the unextensionized filename.
+                pass
             else:
                 logging.warning("Saved image %s with unknown content type %s", img_url, content_type)
 
