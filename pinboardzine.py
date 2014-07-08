@@ -255,7 +255,7 @@ def zine(username: 'Pinboard username to find articles for',
 
     # What pinboard account do I use?
     try:
-        password = getpass.getpass('Password for {}: '.format(username))
+        password = getpass.getpass('Pinboard password for {}: '.format(username))
     except KeyboardInterrupt:
         return
     pinboard_auth = HTTPBasicAuth(username, password)
