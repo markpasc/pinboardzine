@@ -304,6 +304,9 @@ def zine(username: 'Pinboard username to find articles for',
         try:
             res = req.get('https://readability.com/api/content/v1/parser', params=params, timeout=10)
             res.raise_for_status()
+        except requests.exceptions.Timeout:
+            logging.warning("Request for article '%s' timed out, skipping", article['d'])
+            continue
         except Exception as exc:
             logging.exception("Couldn't request article '%s', skipping", article['d'], exc_info=exc)
             continue
