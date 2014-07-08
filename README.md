@@ -26,7 +26,7 @@ If you don't want to install its dependencies system-wide, try installing it in 
 Once you have a Parser API token, run `pinboardzine`.
 
     $ pinboardzine markpasc pinboardzine.mobi --readability-token b5Ae2d340BCBa8773FaebE0db4FCE45AABe2a0b6
-    Password for markpasc:
+    Pinboard password for markpasc:
     $ file pinboardzine.mobi
     pinboardzine.mobi: Mobipocket E-book "Pinboard_Unread"
     $
