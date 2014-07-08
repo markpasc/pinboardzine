@@ -245,11 +245,15 @@ def html_for_readable_article(article, readable, content):
 
 
 @argh.arg('--skip', default=None, action='append')
+@argh.arg('--tag', default=None, action='append')
+@argh.arg('--skip-tag', default=None, action='append')
 def zine(username: 'Pinboard username to find articles for',
          outputfile: 'filename for the output mobi file',
          items: 'number of items to put in the zine' =20,
          readability_token: 'Readability Parser API token to use to parse articles' =None,
-         skip: 'URLs of articles not to include' =None):
+         skip: 'URLs of articles not to include' =None,
+         tag: 'tags articles must have to be included' =None,
+         skip_tag: 'tags of articles not to include' =None):
     req = requests.Session()
     req.headers.update({'user-agent': 'pinboard-zine/{}'.format(__version__)})
 
@@ -267,6 +271,8 @@ def zine(username: 'Pinboard username to find articles for',
     secret = data['result']
 
     # We want the oldest, so ask for as many posts as possible.
+    # We *could* ask to filter by a tag here, but only one, and not to exclude,
+    # so don't bother.
     feed_url = 'https://feeds.pinboard.in/json/secret:{}/u:{}/toread/?count=400'.format(secret, username)
     res = req.get(feed_url, verify=True)
     # The secret should be correct, so don't try to handle an auth error.
@@ -291,12 +297,25 @@ def zine(username: 'Pinboard username to find articles for',
     # For each of however many unread items:
     saved = list()
     skip = set(skip) if skip is not None else set()
+    skip_tags = set(skip_tag) if skip_tag is not None else set()
+    include_tags = set(tag) if tag is not None else None
     for article in articles:
         # Fetch the resource.
         url = article['u']
         if url in skip:
-            logging.info("Skipping article '%s' as requested", article['u'])
+            logging.info("Skipping article '%s' with URL %s as requested", article['d'], article['u'])
             continue
+        article_tags = set(t for t in article['t'] if t)
+        if skip_tags & article_tags:
+            some_tag = (skip_tags & article_tags).pop()
+            logging.info("Skipping article '%s' with tag '%s' as requested", article['d'], some_tag)
+            continue
+        if include_tags:
+            if not include_tags & article_tags:
+                continue
+            some_tag = (include_tags & article_tags).pop()
+            logging.info("Including article '%s' with tag '%s' as requested", article['d'], some_tag)
+
         params = {
             'url': url,
             'token': readability_token,
