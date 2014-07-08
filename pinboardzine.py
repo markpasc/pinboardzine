@@ -152,6 +152,12 @@ def content_opf_for_articles(articles, uid, title):
     manifest_node = root.find("./{http://www.idpf.org/2007/opf}manifest")
     spine_node = root.find("./{http://www.idpf.org/2007/opf}spine")
     guide_node = root.find("./{http://www.idpf.org/2007/opf}guide")
+
+    # Let's track image IDs. If we don't, and multiple articles are from the
+    # same site and embed the same image, we'll make duplicate opf items for
+    # them, which is fatal to kindlegen.
+    seen_image_ids = set()
+
     for article in articles:
         ElementTree.SubElement(guide_node, '{http://www.idpf.org/2007/opf}reference', {
             'title': article['title'],
@@ -169,6 +175,9 @@ def content_opf_for_articles(articles, uid, title):
         })
 
         for image in article.get('images', ()):
+            if image['filename'] in seen_image_ids:
+                continue
+            seen_image_ids.add(image['filename'])
             ElementTree.SubElement(manifest_node, '{http://www.idpf.org/2007/opf}item', {
                 'href': image['filename'],
                 'id': image['filename'],
