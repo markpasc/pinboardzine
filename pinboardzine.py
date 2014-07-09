@@ -278,11 +278,7 @@ def zine(username: 'Pinboard username to find articles for',
     # The secret should be correct, so don't try to handle an auth error.
     res.raise_for_status()
     data = res.json()
-
-    # Get the oldest `items` items, oldest first.
-    logging.debug("Using oldest %d articles of %d from Pinboard", items, len(data))
-    articles = data[-items:]
-    articles.reverse()
+    articles = reversed(data)
 
     # Start making a new zine (tmpdir).
     zinedir = tempfile.mkdtemp()
@@ -387,6 +383,8 @@ def zine(username: 'Pinboard username to find articles for',
         logging.debug("Saved article '%s'", article['title'])
 
         saved.append(article)
+        if len(saved) >= items:
+            break
 
     # Write the metadata files to the zine directory.
     uid = uuid.uuid4().hex
